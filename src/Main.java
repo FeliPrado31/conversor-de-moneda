@@ -1,15 +1,58 @@
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+import com.conversorDeMoneda.http.CurrencyApiClient;
+import com.conversorDeMoneda.model.ExchangeRates;
+import com.conversorDeMoneda.view.CurrencyView;
+import com.google.gson.JsonObject;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+import static com.conversorDeMoneda.utils.CurrencyUtils.convertAndShowCurrency;
+import static com.conversorDeMoneda.utils.MenuUtils.getCurrenciesForChoice;
+import static com.conversorDeMoneda.utils.MenuUtils.showMenuAndGetChoice;
+
+public class Main {
+    private static final String API_URL_TEMPLATE = "https://v6.exchangerate-api.com/v6/%s/latest/%s";
+
+    public static void main(String[] args) {
+        String apiKey = System.getenv("EXCHANGERATE_API_KEY");
+
+        if (apiKey == null) {
+            System.out.println("La variable de entorno EXCHANGERATE_API_KEY no está definida.");
+            return;
+        }
+
+        CurrencyApiClient apiClient = new CurrencyApiClient();
+        CurrencyView view = new CurrencyView();
+
+        view.showWelcomeMessage();
+
+        boolean running = true;
+        while (running) {
+            int choice = showMenuAndGetChoice(view);
+            if (choice == 7) {
+                view.showExitMessage();
+                break;
+            }
+
+            String[] currencies = getCurrenciesForChoice(choice);
+            String baseCurrency = currencies[0];
+            String targetCurrency = currencies[1];
+
+            double amount = view.getAmount();
+
+            String apiUrl = String.format(API_URL_TEMPLATE, apiKey, baseCurrency);
+
+            try {
+                JsonObject jsonResponse = apiClient.getExchangeRates(apiUrl);
+
+                if (jsonResponse.has("error-type")) {
+                    String errorType = jsonResponse.get("error-type").getAsString();
+                    view.showErrorMessage(errorType);
+                } else {
+                    ExchangeRates exchangeRates = new ExchangeRates(jsonResponse);
+                    convertAndShowCurrency(view, exchangeRates, baseCurrency, targetCurrency, amount);
+                }
+            } catch (Exception e) {
+                view.showErrorMessage("Error al obtener las tasas de cambio: " + e.getMessage());
+            }
         }
     }
+
 }
